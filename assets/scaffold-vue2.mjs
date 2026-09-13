@@ -25,6 +25,9 @@ const TEMPLATE_FILES = [
   { source: 'demo.js', target: 'src/data/demo.js' },
   { source: 'ScaleStage.vue', target: 'src/components/layout/ScaleStage.vue' },
   { source: 'PanelShell.vue', target: 'src/components/common/PanelShell.vue' },
+  { source: 'TopHeader.vue', target: 'src/components/common/TopHeader.vue' },
+  { source: 'StatCard.vue', target: 'src/components/cards/StatCard.vue' },
+  { source: 'RankList.vue', target: 'src/components/cards/RankList.vue' },
   { source: 'BaseDataTable.vue', target: 'src/components/base/BaseDataTable.vue' },
   { source: 'BaseChart.vue', target: 'src/components/base/BaseChart.vue' }
 ];

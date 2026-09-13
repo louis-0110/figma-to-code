@@ -1,6 +1,6 @@
 # Vue2 参考模板
 
-这个目录是 `scaffold-vue2.mjs` 的唯一组件模板来源，不是“另一套示例代码”。修改脚手架时先改这里的 SFC，再通过 skill 自测验证生成、结构和浏览器行为。
+这个目录是 `scaffold-vue2.mjs` 的唯一组件模板来源，不是"另一套示例代码"。修改脚手架时先改这里的 SFC，再通过 skill 自测验证生成、结构和浏览器行为。
 
 ## 自测
 
@@ -26,6 +26,9 @@ node assets/test-skill.mjs
 
 - `ScaleStage.vue`：viewport > sizer > stage 三层结构，只负责整帧缩放。
 - `PanelShell.vue`：标题、页签和卡片 body 的通用壳。
+- `TopHeader.vue`：仪表盘顶部导航栏；logo/title 槽 + 页签按钮组 + 右侧内容槽；`data-qa="top-header-{id}"` 和 `data-qa="th-tab-{key}"`。
+- `StatCard.vue`：KPI 指标行；icon + label + value + sub，flex 均分 + 分隔线；`data-qa="stat-{id}"`。
+- `RankList.vue`：排行列表；排名徽标 + 名称 + 进度条 + 数值，按最大值自动归一化宽度；`data-qa="rank-{id}"`。
 - `BaseDataTable.vue`：原生表格底座，首个表头单元格吸顶，tbody 在 wrapper 内滚动。
 - `BaseChart.vue`：ECharts 初始化、更新、resize 和销毁底座。
 - `TabbedTablePanel.vue`：`columnSets` + `rowsByTab` 的业务面板参考，演示页签驱动列集。

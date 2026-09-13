@@ -138,6 +138,9 @@ async function main() {
       'src/data/demo.js',
       'src/components/layout/ScaleStage.vue',
       'src/components/common/PanelShell.vue',
+      'src/components/common/TopHeader.vue',
+      'src/components/cards/StatCard.vue',
+      'src/components/cards/RankList.vue',
       'src/components/base/BaseDataTable.vue',
       'src/components/base/BaseChart.vue',
       'lib/screen-scale.js'
