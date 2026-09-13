@@ -69,6 +69,7 @@ columns: [
 
 - Props:`columns`、`rows`。组件不认识业务页签名,也不保存列集;列集和 `activeTab -> columns/rows` 的计算留在 Panel。
 - 列配置使用 `key/label/width/ellipsis`;特殊单元格用 `type` 和辅助字段,例如 `type:'photo' + altKey + altSuffix`。新增单元格类型前先确认它在多个页面可复用。
+- 探针契约固定:`table-scroll` 在滚动 wrapper 上,`table-head` 在首个 sticky `<th>` 上;不要把 `table-head` 挂到 `<thead>`。
 - 行优先用稳定 `id` 作为 key;结构不同页签的数据不要强行合成一套行对象,按页签分组成 `records.today` / `records.inactive`。
 - 滚动职责固定:wrapper `flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden`,`thead th` sticky 且有不透明背景,`table` 高度 100% 保证行数不足也撑满容器。
 
@@ -94,5 +95,6 @@ columns: [
 
 1. IR 识别页面分区后,先标注哪些区是 KPI 行、业务面板、图表、表格、公共筛选器。
 2. Vue2 驾驶舱按本契约列组件清单,再逐个从 normalized IR 映射 props 和数据形状。
-3. `App.vue` 装配完成即可先冒烟;随后按 PanelShell + base 组件扩展,避免先生成散落 HTML 再返工。
-4. 验收时断言组件关系与架构一致:`viewport > sizer > stage`、panel body 有剩余高度、表格滚动区可滚、图表随缩放 resize、页签切换精确列集。具体探针见 `assets/protocols/verification.md`。
+3. 无构建新项目先运行 `scaffold-vue2.mjs`;它的组件来源是 skill 内 `assets/templates/vue2/`,生成后再替换业务内容,不复制旧项目散落 HTML。
+4. `App.vue` 装配完成即可先冒烟;随后按 PanelShell + base 组件扩展,避免先生成散落 HTML 再返工。
+5. 验收时断言组件关系与架构一致:`viewport > sizer > stage`、panel body 有剩余高度、表格滚动区可滚、图表随缩放 resize、页签切换精确列集。具体探针见 `assets/protocols/verification.md`。

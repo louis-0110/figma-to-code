@@ -49,7 +49,7 @@ node diff.js <design.png> <shot.png>
 - 截图验证:不重叠、不溢出、不崩(ellipsis/越列策略生效)
 - **滚动断言**:定高容器内内容超出 → `.scroll-region` 的 `scrollHeight > clientHeight` 且区域内滚动(不撑破卡片/舞台);表头 `position:sticky` 生效;无横向溢出
 - **Playwright 尺寸探针**:标准视口外再跑短视口(如 1920×800)。`width-adapt` 断言舞台 `width ≈ 滚动容器 clientWidth`,短视口只允许目标容器出现竖向滚动;若滚动条影响宽度,等待 ResizeObserver 后再量一次
-- **表头探针**:先把表格 wrapper `scrollTop = scrollHeight`,再断言 `theadRect.top - scrollerRect.top` 在 ±2px 内;同时断言表格底边接近面板内容底边,证明它撑满容器而非固定高度
+- **表头探针**:先把表格 wrapper `scrollTop = scrollHeight`,再断言表头相对 wrapper 的 offset 在 ±2px 内;同时断言表格底边接近面板内容底边,证明它撑满容器而非固定高度
 - **表格压测钩子**:支持 `?tableStress=1` 后把少量测试行克隆成压力行数(如 6→24),断言行数、`scrollHeight > clientHeight`、只出现纵向滚动、`overflow-x` 不可见滚动、表格/wrapper 撑满面板内容区、表头吸顶,且超长文本和特殊字段不破坏行高;页签型页面要覆盖每个页签的压测字段
 - **console 冒烟**:页面加载、缩放、注入数据后收集 console errors;任何未捕获异常都算弹性门失败
 
@@ -70,26 +70,39 @@ node diff.js <design.png> <shot.png>
 
 ## 自动 UI 探针
 
-结构审计完成后，先用 bundled `verify-ui.mjs` 做浏览器断言，再进像素与弹性门；项目没有表格时加 `--skip-table`。它依赖目标项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright。
+结构审计完成后,先用 bundled `verify-ui.mjs` 做浏览器断言,再进像素与弹性门;项目没有表格时加 `--skip-table`。它依赖目标项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright。
+
+默认 selector 契约是:
+
+```text
+[data-qa="scale-viewport"]  外层 100% 宽、超高纵向滚动的容器
+[data-qa="stage"]           transform 缩放舞台
+[data-qa="table-scroll"]    表格纵向滚动容器
+[data-qa="table-head"]      首个实际 sticky 的表头单元格
+```
+
+找不到契约节点时回退 `.scale-viewport`、`.scale-stage`、`.table-wrapper`、`thead`;显式 CLI 参数优先级最高。JSON 输出的 `selectors` 必须记录实际命中的 selector,避免验收结果和源码契约脱节。
 
 ```bash
 node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x1080
 node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x800
 ```
 
-bundled Playwright 与本机浏览器 registry 不匹配时，不要联网下载；改用系统 Chrome/Edge：
+bundled Playwright 与本机浏览器 registry 不匹配时,不要联网下载;优先设 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright,并改用系统 Chrome/Edge:
 
 ```bash
-node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x1080 \
-  --browser-executable "C:\Program Files\Google\Chrome\Application\chrome.exe"
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe" \
+node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x1080
 ```
 
-等价环境变量是 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`；两个来源同时存在时 CLI 参数优先。
+也可以用 `--browser-executable` 传浏览器路径;CLI 参数优先于环境变量。
 
-探针固定断言：
+探针固定断言:
 
 - 页面加载成功且 console errors 为 0
-- `width-adapt` 下 stage 宽度等于 scroll container `clientWidth`（误差 <=2px）
-- scroll container 无横向溢出；短视口超高时允许且要求纵向滚动
-- 有表格时 `.table-wrapper` 只纵向滚动，`scrollWidth <= clientWidth + 1`
-- 表头吸顶：把 wrapper 滚到底后，thead 相对 wrapper 的 offset 变化与绝对位置误差均 <=2px
+- `width-adapt` 下 stage 宽度等于 scroll container `clientWidth`(误差 <=2px)
+- scroll container 无横向溢出;短视口超高时允许且要求纵向滚动
+- 有表格时 `table-scroll` 只纵向滚动,`scrollWidth <= clientWidth + 1`
+- 表头吸顶:把 wrapper 滚到底后,表头相对 wrapper 的 offset 变化与绝对位置误差均 <=2px
+- `table-head` 挂在首个实际 sticky 的 `<th>` 上,不挂外层 `<thead>`;sticky 行滚动时外层 `<thead>` 仍可能跟着移动,挂在错误宿主会造成验收误判

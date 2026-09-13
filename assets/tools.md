@@ -45,6 +45,20 @@
 | `AGENTS-snippet.md` | 复制进 Codex/Cursor 的 AGENTS.md,同一 config 两边接续 |
 | `figma-mcp.example.json` | TalkToFigma MCP 注册模板(clone 变体 / npx 变体) |
 
+## 契约、脚手架、模板与自测
+
+| 资源 | 用法 | 说明 |
+|---|---|---|
+| `lib/screen-scale.js` | `<script src="lib/screen-scale.js">` 后调 `window.ScreenScale.create(...)` | 捆绑的自研缩放库 v1.4;模式、DOM 契约和陷阱见 `protocols/scale.md` |
+| `validate-config.mjs` | `node validate-config.mjs <config.json-or-project-root>` | 零依赖校验 `contractVersion=1`、框架/缩放枚举和 features 契约;也可 `import { validateConfig }` |
+| `scaffold-vue2.mjs` | `node scaffold-vue2.mjs <target-root>`;先 `--dry-run` 预览 | 仅支持 `vue2-nobuild`;不覆盖已有文件;模板唯一来源是 `templates/vue2/`;生成 Vue2 SFC 结构并复制 bundled 缩放库;缺失本地 Vue/iView/echarts 时输出 WARN |
+| `templates/vue2/` | 由 `scaffold-vue2.mjs` 复制 | Vue2 SFC 唯一模板来源;先改模板,再跑自测,不要在生成器里内联整份组件 |
+| `test-skill.mjs` | `node test-skill.mjs`;临时产物可加 `--keep`,无浏览器环境加 `--skip-browser` | 校验 config contract、三个入口脚本语法、Vue2 scaffold 文件、`data-qa` selector 和本地 HTTP fixture 浏览器冒烟;成功输出 `7/7 passed` |
+| `verify-ui.mjs` | `node verify-ui.mjs --url <URL> --viewport 1920x800` | Playwright/Chromium 探针;断言 stage 宽度、横向溢出、竖向滚动、表格只纵向滚动、表头吸顶和 console errors。依赖项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright |
+| 同上 | 显式 `--scroll-container/--stage/--table-wrapper/--thead` 参数优先 | 默认按 `data-qa` 契约查找,找不到时回退 legacy selector;JSON 输出的 `selectors` 记录实际命中的 selector |
+| 同上 | 加 `--browser-executable <Chrome/Edge 路径>`,或设 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | bundled 浏览器版本不匹配时用系统 Chrome/Edge,不联网下载浏览器 |
+| `codegen.config.schema.json` | 开工问卷契约的 JSON Schema;`contractVersion` 当前为 1 |  |
+
 ## MCP 运行时
 
 | 资源 | 说明 |
@@ -55,13 +69,3 @@
 | `mcp/figma-plugin/` | Figma 插件(manifest.json / code.js / ui.html) |
 
 共 ~86KB,零 node_modules(上游 tsup 全量打包)。详见 `protocols/environment.md`。
-## 契约、脚手架与 UI 探针
-
-| 资源 | 用法 | 说明 |
-|---|---|---|
-| `lib/screen-scale.js` | `<script src="lib/screen-scale.js">` 后调 `window.ScreenScale.create(...)` | 捆绑的自研缩放库 v1.4；模式、DOM 契约和陷阱见 `protocols/scale.md` |
-| `validate-config.mjs` | `node validate-config.mjs <config.json-or-project-root>` | 零依赖校验 `contractVersion=1`、框架/缩放枚举和 features 契约；也可 `import { validateConfig }` |
-| `scaffold-vue2.mjs` | `node scaffold-vue2.mjs <target-root>`；先 `--dry-run` 预览 | 仅支持 `vue2-nobuild`；不覆盖已有文件；生成 Vue2 SFC 结构并复制 bundled 缩放库；缺失本地 Vue/iView/echarts 时输出 WARN |
-| `verify-ui.mjs` | `node verify-ui.mjs --url <URL> --viewport 1920x800` | Playwright/Chromium 探针；断言 stage 宽度、横向溢出、竖向滚动、表格只纵向滚动、thead 吸顶和 console errors。依赖项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright |
-| 同上 | 加 `--browser-executable <Chrome/Edge 路径>`，或设 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | bundled 浏览器版本不匹配时用系统 Chrome/Edge，不联网下载浏览器 |
-| `codegen.config.schema.json` | 开工问卷契约的 JSON Schema；`contractVersion` 当前为 1 |

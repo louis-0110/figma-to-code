@@ -4,18 +4,38 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
+const DATA_QA_SELECTORS = {
+  scrollContainer: '[data-qa="scale-viewport"]',
+  stage: '[data-qa="stage"]',
+  tableWrapper: '[data-qa="table-scroll"]',
+  thead: '[data-qa="table-head"]'
+};
+
+const FALLBACK_SELECTORS = {
+  scrollContainer: ['.scale-viewport', '#viewport'],
+  stage: ['.scale-stage', '#stage'],
+  tableWrapper: ['.table-wrapper', '.table-scroll'],
+  thead: ['thead']
+};
+
 function usage() {
   process.stdout.write(`Usage: node verify-ui.mjs --url <URL> [options]
 
 Options:
   --viewport 1920x1080       Browser viewport (default: 1920x1080)
   --wait 1200                Settle wait after navigation in ms (default: 1200)
-  --scroll-container sel     Scale scroll container (default: .scale-viewport)
-  --stage sel                Scale stage (default: .scale-stage)
-  --table-wrapper sel        Table scroll wrapper (default: .table-wrapper)
-  --thead sel                Table header (default: thead)
+  --scroll-container sel     Scale scroll container (default: data-qa contract, then legacy selectors)
+  --stage sel                Scale stage (default: data-qa contract, then legacy selectors)
+  --table-wrapper sel        Table scroll wrapper (default: data-qa contract, then legacy selectors)
+  --thead sel                Table header (default: data-qa contract, then thead)
   --skip-table               Skip table assertions
   --browser-executable PATH  Chromium executable (or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)
+
+Selector contract:
+  [data-qa="scale-viewport"], [data-qa="stage"],
+  [data-qa="table-scroll"], [data-qa="table-head"]
+
+Legacy .scale-viewport / .scale-stage / .table-wrapper selectors remain supported.
 `);
 }
 
@@ -24,10 +44,10 @@ function parseArgs(argv) {
     url: '',
     viewport: [1920, 1080],
     wait: 1200,
-    scrollContainer: '.scale-viewport',
-    stage: '.scale-stage',
-    tableWrapper: '.table-wrapper',
-    thead: 'thead',
+    scrollContainer: null,
+    stage: null,
+    tableWrapper: null,
+    thead: null,
     skipTable: false,
     browserExecutable: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || ''
   };
@@ -81,6 +101,38 @@ async function loadPlaywright() {
   }
 }
 
+async function resolveSelector(page, explicit, candidates, label) {
+  const selectors = explicit ? [explicit] : [DATA_QA_SELECTORS[label], ...candidates[label]];
+  const found = await page.evaluate((selectorList) => {
+    for (const selector of selectorList) {
+      if (document.querySelector(selector)) return selector;
+    }
+    return '';
+  }, selectors);
+
+  if (!found) {
+    const expected = selectors.join(', ');
+    throw new Error(`UI selector not found for ${label}. Expected one of: ${expected}`);
+  }
+  return found;
+}
+
+async function resolveSelectors(page, options) {
+  const selectors = {
+    scrollContainer: await resolveSelector(page, options.scrollContainer, FALLBACK_SELECTORS, 'scrollContainer'),
+    stage: await resolveSelector(page, options.stage, FALLBACK_SELECTORS, 'stage')
+  };
+
+  if (!options.skipTable) {
+    selectors.tableWrapper = await resolveSelector(page, options.tableWrapper, FALLBACK_SELECTORS, 'tableWrapper');
+    selectors.thead = await resolveSelector(page, options.thead, FALLBACK_SELECTORS, 'thead');
+  } else {
+    selectors.tableWrapper = '';
+    selectors.thead = '';
+  }
+  return selectors;
+}
+
 async function metrics(page, selectors) {
   return page.evaluate((selectors) => {
     function box(selector) {
@@ -130,22 +182,26 @@ async function main() {
   });
 
   const checks = [];
-  const selectors = {
-    scrollContainer: options.scrollContainer,
-    stage: options.stage,
-    tableWrapper: options.skipTable ? '' : options.tableWrapper,
-    thead: options.skipTable ? '' : options.thead
-  };
-
+  let selectors = {};
   try {
     const response = await page.goto(options.url, { waitUntil: 'load', timeout: 15000 });
     await page.waitForTimeout(options.wait);
     checks.push({ id: 'page-load', pass: Boolean(response?.ok()), detail: `HTTP ${response ? response.status() : 'no response'}` });
 
-    const before = await metrics(page, selectors);
-    if (!before.scroll || !before.stage) {
-      checks.push({ id: 'scale-dom', pass: false, detail: `missing ${!before.scroll ? options.scrollContainer : options.stage}` });
-    } else {
+    try {
+      selectors = await resolveSelectors(page, options);
+      checks.push({
+        id: 'selector-contract',
+        pass: true,
+        detail: JSON.stringify(selectors)
+      });
+    } catch (error) {
+      selectors = null;
+      checks.push({ id: 'selector-contract', pass: false, detail: error.message });
+    }
+
+    if (selectors) {
+      const before = await metrics(page, selectors);
       const widthDelta = Math.abs(before.stage.width - before.scroll.clientWidth);
       checks.push({ id: 'stage-width', pass: widthDelta <= 2, detail: `stage=${before.stage.width.toFixed(1)}px container=${before.scroll.clientWidth}px delta=${widthDelta.toFixed(1)}px` });
       checks.push({ id: 'no-horizontal-overflow', pass: before.scroll.scrollWidth <= before.scroll.clientWidth + 1, detail: `scrollWidth=${before.scroll.scrollWidth} clientWidth=${before.scroll.clientWidth}` });
@@ -154,17 +210,13 @@ async function main() {
       } else {
         checks.push({ id: 'vertical-scroll', pass: true, skipped: true, detail: 'no vertical overflow at this viewport' });
       }
-    }
 
-    if (!options.skipTable) {
-      if (!before.wrapper) {
-        checks.push({ id: 'table-wrapper', pass: false, detail: `missing ${options.tableWrapper}` });
-      } else {
+      if (!options.skipTable) {
         checks.push({ id: 'table-vertical-overflow-only', pass: before.wrapper.scrollWidth <= before.wrapper.clientWidth + 1, detail: `scrollWidth=${before.wrapper.scrollWidth} clientWidth=${before.wrapper.clientWidth}` });
         if (before.wrapper.scrollHeight > before.wrapper.clientHeight + 2) {
           await page.evaluate((selector) => {
             document.querySelector(selector).scrollTop = document.querySelector(selector).scrollHeight;
-          }, options.tableWrapper);
+          }, selectors.tableWrapper);
           await page.waitForTimeout(80);
           const after = await metrics(page, selectors);
           const first = before.thead.top - before.wrapper.top;
@@ -177,19 +229,20 @@ async function main() {
         }
       }
     }
-
     checks.push({ id: 'console-errors', pass: consoleErrors.length === 0, detail: consoleErrors.length ? consoleErrors.join(' | ') : 'none' });
   } finally {
     await browser.close();
   }
 
+  const passed = checks.every((check) => check.pass);
   process.stdout.write(`${JSON.stringify({
     url: options.url,
     viewport: `${options.viewport[0]}x${options.viewport[1]}`,
-    pass: checks.every((check) => check.pass),
+    selectors,
+    pass: passed,
     checks
   }, null, 2)}\n`);
-  process.exitCode = checks.every((check) => check.pass) ? 0 : 1;
+  process.exitCode = passed ? 0 : 1;
 }
 
 main().catch((error) => {

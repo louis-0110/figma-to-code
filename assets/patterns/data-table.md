@@ -10,15 +10,21 @@
 <section aria-label="XX列表">
   <div class="hd"><h2>标题</h2><a/button>次操作</a></div>
   <div class="toolbar">…搜索 input + 筛选…</div>
-  <div class="table-scroll">
+  <div class="table-scroll" data-qa="table-scroll">
     <table>
       <colgroup><col>…按实测列宽…</colgroup>
-      <thead><tr><th scope="col">…含排序 button + aria-sort…</th></tr></thead>
-      <tbody><tr v-for>…td…</tr></tbody>
+      <thead>
+        <tr>
+          <th scope="col" data-qa="table-head">…含排序 button + aria-sort…</th>
+        </tr>
+      </thead>
+      <tbody data-qa="table-body"><tr v-for>…td…</tr></tbody>
     </table>
   </div>
 </section>
 ```
+
+浏览器探针契约:`table-scroll` 在滚动 wrapper 上;`table-head` 在首个实际 sticky 的 `<th>` 上,不要挂 `<thead>`。sticky `<th>` 吸顶时,外层 `<thead>` 仍可能随滚动移动;挂在错误宿主会造成验收误判。
 
 ## 页签驱动列集
 - Figma 同一面板的多个页签状态要逐状态读:页签可能换字段、列宽、列数和单元格类型,不是只换数据。用各状态的表头文本 + 首行单元格判断映射。

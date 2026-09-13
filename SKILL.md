@@ -37,6 +37,7 @@ description: Figma MCP 读取设计稿,生成高还原度结构化前端页面(V
 | Vue2 脚手架 | `node <skill>/assets/scaffold-vue2.mjs <项目根>` |
 | 缩放库 | `assets/protocols/scale.md` |
 | UI 探针 | `node <skill>/assets/verify-ui.mjs --url <URL> ...` |
+| Skill 自测 | `node <skill>/assets/test-skill.mjs` |
 | 图表 | `assets/protocols/charts.md` |
 
 ## 环境配置
@@ -93,6 +94,8 @@ MCP / REST token / 运行时诊断详见 `assets/protocols/environment.md`。新
 
 依赖矩阵、main.js 骨架、冒烟流程详见 `assets/protocols/vue2-stack.md`。新项目优先用 `scaffold-vue2.mjs` 生成统一骨架,再进入页面还原。Vue3 栈用 vue@3.4 + Vite + view-ui-plus。
 
+`scaffold-vue2.mjs` 的唯一模板来源是 `assets/templates/vue2/`;修改脚手架前先改 SFC 模板,再用 `test-skill.mjs` 验证配置、产物、selector 和浏览器契约。推荐用 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright,并用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指向系统 Chrome/Edge,不要联网下载浏览器。
+
 ## 五、缩放与图表
 
 - 缩放库 screen-scale.js 接口、模式选型、陷阱详见 `assets/protocols/scale.md`
@@ -132,3 +135,5 @@ MCP / REST token / 运行时诊断详见 `assets/protocols/environment.md`。新
 - `assets/validate-config.mjs` — config 校验器
 - `assets/scaffold-vue2.mjs` — Vue2 无构建骨架生成器
 - `assets/verify-ui.mjs` — Playwright 结构/缩放/表头探针
+- `assets/test-skill.mjs` — 配置、脚手架、selector 与浏览器契约自测
+- `assets/templates/vue2/` — Vue2 scaffold 唯一模板来源

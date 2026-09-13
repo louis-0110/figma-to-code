@@ -7,4 +7,7 @@
 - Added `codegen.config.schema.json` and zero-dependency `validate-config.mjs` for contract v1.
 - Added `scaffold-vue2.mjs` for non-destructive Vue2 SFC project scaffolding.
 - Added `verify-ui.mjs` Playwright probes for scale, scroll, sticky table headers, and console errors.
-- Documented the contract/scaffold/probe workflow and updated validation examples.
+- Standardized `data-qa` selectors for scale and table probes, with legacy selector fallbacks and explicit CLI overrides.
+- Changed `table-head` to point at the first sticky `<th>` instead of `<thead>`; sticky headers remain stable while `tbody` scrolls.
+- Converted Vue2 scaffolding to reusable templates under `assets/templates/vue2/`.
+- Added `test-skill.mjs` for config, syntax, scaffold, selector, and local browser smoke checks.
