@@ -8,14 +8,20 @@ const DATA_QA_SELECTORS = {
   scrollContainer: '[data-qa="scale-viewport"]',
   stage: '[data-qa="stage"]',
   tableWrapper: '[data-qa="table-scroll"]',
-  thead: '[data-qa="table-head"]'
+  thead: '[data-qa="table-head"]',
+  panelTabs: '[data-qa="panel-tabs"]',
+  searchInput: '[data-qa="search-input"]',
+  chartCanvas: '[data-qa="chart"]'
 };
 
 const FALLBACK_SELECTORS = {
   scrollContainer: ['.scale-viewport', '#viewport'],
   stage: ['.scale-stage', '#stage'],
   tableWrapper: ['.table-wrapper', '.table-scroll'],
-  thead: ['thead']
+  thead: ['thead'],
+  panelTabs: ['.panel-tabs'],
+  searchInput: ['input[type="search"]', '.search-input'],
+  chartCanvas: ['canvas.chart', '.chart canvas']
 };
 
 function usage() {
@@ -29,11 +35,18 @@ Options:
   --table-wrapper sel        Table scroll wrapper (default: data-qa contract, then legacy selectors)
   --thead sel                Table header (default: data-qa contract, then thead)
   --skip-table               Skip table assertions
+  --check-tabs               Click each tab button and verify table content changes
+  --check-search TEXT        Type search text and verify row count changes
+  --check-chart              Verify chart canvas exists with non-blank pixels
+  --panel-tabs sel           Tab button container (default: data-qa contract, then legacy)
+  --search-input sel         Search input selector (default: data-qa contract, then legacy)
+  --chart-canvas sel         Chart canvas selector (default: data-qa contract, then legacy)
   --browser-executable PATH  Chromium executable (or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)
 
 Selector contract:
   [data-qa="scale-viewport"], [data-qa="stage"],
-  [data-qa="table-scroll"], [data-qa="table-head"]
+  [data-qa="table-scroll"], [data-qa="table-head"],
+  [data-qa="panel-tabs"], [data-qa="search-input"], [data-qa="chart"]
 
 Legacy .scale-viewport / .scale-stage / .table-wrapper selectors remain supported.
 `);
@@ -49,6 +62,12 @@ function parseArgs(argv) {
     tableWrapper: null,
     thead: null,
     skipTable: false,
+    checkTabs: false,
+    checkSearch: '',
+    checkChart: false,
+    panelTabs: null,
+    searchInput: null,
+    chartCanvas: null,
     browserExecutable: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || ''
   };
 
@@ -70,6 +89,12 @@ function parseArgs(argv) {
       case '--table-wrapper': options.tableWrapper = value; index += 1; break;
       case '--thead': options.thead = value; index += 1; break;
       case '--skip-table': options.skipTable = true; break;
+      case '--check-tabs': options.checkTabs = true; break;
+      case '--check-search': options.checkSearch = value || 'row'; index += 1; break;
+      case '--check-chart': options.checkChart = true; break;
+      case '--panel-tabs': options.panelTabs = value; index += 1; break;
+      case '--search-input': options.searchInput = value; index += 1; break;
+      case '--chart-canvas': options.chartCanvas = value; index += 1; break;
       case '--browser-executable': options.browserExecutable = value; index += 1; break;
       case '--help': case '-h': options.help = true; break;
       default: throw new Error(`unknown option: ${arg}`);
@@ -130,6 +155,17 @@ async function resolveSelectors(page, options) {
     selectors.tableWrapper = '';
     selectors.thead = '';
   }
+
+  if (options.checkTabs) {
+    selectors.panelTabs = await resolveSelector(page, options.panelTabs, FALLBACK_SELECTORS, 'panelTabs');
+  }
+  if (options.checkSearch) {
+    selectors.searchInput = await resolveSelector(page, options.searchInput, FALLBACK_SELECTORS, 'searchInput');
+  }
+  if (options.checkChart) {
+    selectors.chartCanvas = await resolveSelector(page, options.chartCanvas, FALLBACK_SELECTORS, 'chartCanvas');
+  }
+
   return selectors;
 }
 
@@ -161,6 +197,58 @@ async function metrics(page, selectors) {
       thead: selectors.tableWrapper && !selectors.skipTable ? box(selectors.thead) : null
     };
   }, selectors);
+}
+
+async function tabProbe(page, tabSelector, tableSelector) {
+  const buttons = await page.$$(`${tabSelector} button`);
+  if (buttons.length < 2) return { pass: true, detail: `only ${buttons.length} tab(s), skipping content-change assertion` };
+
+  const headerTexts = [];
+  for (const tab of buttons) {
+    await tab.click();
+    await page.waitForTimeout(200);
+    const text = await page.$eval(tableSelector, (el) => {
+      if (!el) return '';
+      const table = el.querySelector('table') || el;
+      const ths = table.querySelectorAll('th');
+      return Array.from(ths).map((th) => th.textContent.trim()).join('|');
+    });
+    headerTexts.push(text);
+  }
+  const hasDiff = headerTexts.some((t, i) => i > 0 && t !== headerTexts[0]);
+  return { pass: hasDiff, detail: `clicked ${buttons.length} tabs; header sets ${hasDiff ? 'change across tabs' : 'are identical (may indicate column set not wired)'}` };
+}
+
+async function searchProbe(page, inputSelector, wrapperSelector, text) {
+  const rowSelector = `${wrapperSelector} tbody tr`;
+  const beforeCount = await page.$$eval(rowSelector, (rows) => rows.length);
+  await page.fill(inputSelector, text);
+  await page.waitForTimeout(300);
+  const afterCount = await page.$$eval(rowSelector, (rows) => rows.length);
+  await page.fill(inputSelector, '');
+  await page.waitForTimeout(200);
+  const restoredCount = await page.$$eval(rowSelector, (rows) => rows.length);
+  const changed = afterCount !== beforeCount;
+  const restored = restoredCount === beforeCount;
+  return { pass: changed && restored, detail: `before=${beforeCount} filtered=${afterCount} restored=${restoredCount} text="${text}" changed=${changed} restored=${restored}` };
+}
+
+async function chartProbe(page, canvasSelector) {
+  return page.evaluate((sel) => {
+    const canvas = document.querySelector(sel);
+    if (!canvas) return { pass: false, detail: 'canvas not found' };
+    if (canvas.width === 0 || canvas.height === 0) return { pass: false, detail: `canvas has zero dimensions ${canvas.width}x${canvas.height}` };
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { pass: false, detail: 'cannot get 2d context' };
+    const w = Math.min(canvas.width, 200);
+    const h = Math.min(canvas.height, 200);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let nonBlank = 0;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) { nonBlank++; if (nonBlank > 10) break; }
+    }
+    return { pass: nonBlank > 10, detail: `canvas=${canvas.width}x${canvas.height} nonBlankPixels=${nonBlank} (checked ${w}x${h} region)` };
+  }, canvasSelector);
 }
 
 async function main() {
@@ -226,6 +314,33 @@ async function main() {
           checks.push({ id: 'tbody-scrolls', pass: true, detail: `scrollHeight=${after.wrapper.scrollHeight} clientHeight=${after.wrapper.clientHeight}` });
         } else {
           checks.push({ id: 'tbody-scrolls', pass: true, skipped: true, detail: 'table rows do not overflow at this viewport' });
+        }
+      }
+
+      if (options.checkTabs && selectors.panelTabs) {
+        try {
+          const result = await tabProbe(page, selectors.panelTabs, selectors.tableWrapper);
+          checks.push({ id: 'tab-column-sets', pass: result.pass, detail: result.detail });
+        } catch (error) {
+          checks.push({ id: 'tab-column-sets', pass: false, detail: error.message });
+        }
+      }
+
+      if (options.checkSearch && selectors.searchInput) {
+        try {
+          const result = await searchProbe(page, selectors.searchInput, selectors.tableWrapper, options.checkSearch);
+          checks.push({ id: 'search-filter', pass: result.pass, detail: result.detail });
+        } catch (error) {
+          checks.push({ id: 'search-filter', pass: false, detail: error.message });
+        }
+      }
+
+      if (options.checkChart && selectors.chartCanvas) {
+        try {
+          const result = await chartProbe(page, selectors.chartCanvas);
+          checks.push({ id: 'chart-canvas', pass: result.pass, detail: result.detail });
+        } catch (error) {
+          checks.push({ id: 'chart-canvas', pass: false, detail: error.message });
         }
       }
     }

@@ -10,4 +10,5 @@
 - Standardized `data-qa` selectors for scale and table probes, with legacy selector fallbacks and explicit CLI overrides.
 - Changed `table-head` to point at the first sticky `<th>` instead of `<thead>`; sticky headers remain stable while `tbody` scrolls.
 - Converted Vue2 scaffolding to reusable templates under `assets/templates/vue2/`.
-- Added `test-skill.mjs` for config, syntax, scaffold, selector, and local browser smoke checks.
+- Added `test-skill.mjs` for config, syntax, scaffold, selector, local browser smoke, and interaction-probe checks.
+- Added opt-in `verify-ui.mjs` probes for tab switching, search filtering/restoring, and non-blank chart canvas rendering.

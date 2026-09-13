@@ -76,24 +76,80 @@ function startServer(fixture) {
   });
 }
 
-async function browserSmoke() {
-  const fixture = `<!doctype html>
-<html><head><meta charset="utf-8"><style>
-html,body{margin:0;width:100%;height:100%}
-[data-qa=scale-viewport]{width:100%;height:400px;overflow-x:hidden;overflow-y:auto}
-[data-qa=stage]{width:100%;height:800px;background:#f3f5f9}
-[data-qa=table-scroll]{height:200px;overflow-y:auto;overflow-x:hidden}
-table{width:100%;height:100%;border-collapse:collapse}
-th{position:sticky;top:0;background:#fff;height:40px}
-td{height:60px}
-</style></head><body>
-<div data-qa="scale-viewport"><div data-qa="stage">
-  <div data-qa="table-scroll"><table><thead><tr><th data-qa="table-head">name</th></tr></thead><tbody data-qa="table-body">${Array.from({ length: 12 }, (_, index) => `<tr><td>row ${index}</td></tr>`).join('')}</tbody></table></div>
-</div></div>
-</body></html>`;
+const FIXTURE = [
+  '<!doctype html>',
+  '<html><head><meta charset="utf-8"><style>',
+  'html,body{margin:0;width:100%;height:100%}',
+  '[data-qa=scale-viewport]{width:100%;height:400px;overflow-x:hidden;overflow-y:auto;box-sizing:border-box}',
+  '[data-qa=stage]{width:100%;height:800px;background:#f3f5f9;padding:10px;box-sizing:border-box}',
+  '[data-qa=panel-tabs]{display:flex;gap:4px;margin-bottom:8px}',
+  '[data-qa=panel-tabs] button{padding:4px 12px;cursor:pointer;border:1px solid #ccc;background:#fff}',
+  '[data-qa=panel-tabs] button.on{background:#1867ff;color:#fff;border-color:#1867ff}',
+  '[data-qa=search-input]{padding:4px 8px;width:200px;margin-bottom:8px}',
+  '[data-qa=table-scroll]{height:200px;overflow-y:auto;overflow-x:hidden}',
+  'table{width:100%;height:100%;border-collapse:collapse}',
+  'th{position:sticky;top:0;background:#fff;height:40px}',
+  'td{height:60px}',
+  '[data-qa=chart]{display:block;margin-top:8px}',
+  '</style></head><body>',
+  '<div data-qa="scale-viewport"><div data-qa="stage">',
+  '<input data-qa="search-input" type="text" placeholder="search">',
+  '<div data-qa="panel-tabs">',
+  '<button data-tab="a" class="on">Tab A</button>',
+  '<button data-tab="b">Tab B</button>',
+  '</div>',
+  '<div data-qa="table-scroll"><table><thead><tr id="th-row"></tr></thead><tbody id="tb-body"></tbody></table></div>',
+  '<canvas data-qa="chart" width="200" height="150"></canvas>',
+  '</div></div>',
+  '<script>',
+  "var activeTab='a',searchText='';",
+  'var data=[',
+  "{name:'alpha',a:10,b:20},{name:'beta',a:30,b:40},{name:'gamma',a:50,b:60},",
+  "{name:'delta',a:70,b:80},{name:'epsilon',a:90,b:100},{name:'zeta',a:110,b:120},",
+  "{name:'eta',a:130,b:140},{name:'theta',a:150,b:160},{name:'iota',a:170,b:180},",
+  "{name:'kappa',a:190,b:200},{name:'lambda',a:210,b:220},{name:'mu',a:230,b:240}",
+  '];',
+  'function render(){',
+  "var thRow=document.getElementById('th-row');",
+  "var tb=document.getElementById('tb-body');",
+  "var cols=activeTab==='a'?['name','a']:['name','b'];",
+  "thRow.innerHTML=cols.map(function(c,i){",
+  "return '<th'+(i===0?' data-qa=\"table-head\"':'')+'>'+c+'</th>';",
+  '}).join("");',
+  'var filtered=data.filter(function(r){',
+  'return !searchText||r.name.indexOf(searchText)>=0;',
+  '});',
+  'tb.innerHTML=filtered.map(function(r){',
+  "return '<tr>'+cols.map(function(c){return \'<td>\'+r[c]+\'</td>\';}).join(\'\')+\'</tr>\';",
+  '}).join("");',
+  '}',
+  "document.querySelectorAll('[data-qa=panel-tabs] button').forEach(function(btn){",
+  "btn.addEventListener('click',function(){",
+  "document.querySelectorAll('[data-qa=panel-tabs] button').forEach(function(b){b.classList.remove('on')});",
+  "btn.classList.add('on');",
+  "activeTab=btn.getAttribute('data-tab');",
+  'render();',
+  '});',
+  '});',
+  "document.querySelector('[data-qa=search-input]').addEventListener('input',function(e){",
+  'searchText=e.target.value.toLowerCase();',
+  'render();',
+  '});',
+  "var canvas=document.querySelector('[data-qa=chart]');",
+  "var ctx=canvas.getContext('2d');",
+  "ctx.fillStyle='#1867ff';",
+  'ctx.fillRect(10,10,180,130);',
+  "ctx.fillStyle='#fff';",
+  "ctx.font='24px sans-serif';",
+  "ctx.fillText('Chart',60,80);",
+  'render();',
+  '</script>',
+  '</body></html>'
+].join('\n');
 
+async function browserSmoke() {
   await loadPlaywright();
-  const server = await startServer(fixture);
+  const server = await startServer(FIXTURE);
   const address = server.address();
   const url = `http://127.0.0.1:${address.port}/fixture.html`;
   try {
@@ -105,6 +161,28 @@ td{height:60px}
     const result = JSON.parse(output.slice(output.indexOf('{')));
     const failed = result.checks.filter((item) => !item.pass).map((item) => item.id);
     check('browser-ui-contract', result.pass === true, failed.join(', ') || 'all assertions passed');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+async function interactionSmoke() {
+  await loadPlaywright();
+  const server = await startServer(FIXTURE);
+  const address = server.address();
+  const url = `http://127.0.0.1:${address.port}/fixture.html`;
+  try {
+    const output = await runNode(join(skillAssets, 'verify-ui.mjs'), [
+      '--url', url,
+      '--viewport', '800x500',
+      '--wait', '100',
+      '--check-tabs',
+      '--check-search', 'alpha',
+      '--check-chart'
+    ]);
+    const result = JSON.parse(output.slice(output.indexOf('{')));
+    const failed = result.checks.filter((item) => !item.pass).map((item) => item.id);
+    check('interaction-probes', result.pass === true, failed.join(', ') || 'tabs + search + chart all passed');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -171,8 +249,14 @@ async function main() {
       } catch (error) {
         check('browser-ui-contract', false, error.message);
       }
+      try {
+        await interactionSmoke();
+      } catch (error) {
+        check('interaction-probes', false, error.message);
+      }
     } else {
       check('browser-ui-contract', true, 'skipped by --skip-browser');
+      check('interaction-probes', true, 'skipped by --skip-browser');
     }
   } finally {
     if (keep) {

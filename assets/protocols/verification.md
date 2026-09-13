@@ -79,13 +79,18 @@ node diff.js <design.png> <shot.png>
 [data-qa="stage"]           transform 缩放舞台
 [data-qa="table-scroll"]    表格纵向滚动容器
 [data-qa="table-head"]      首个实际 sticky 的表头单元格
+[data-qa="panel-tabs"]       可选 tab 切换按钮容器
+[data-qa="search-input"]     可选搜索输入框
+[data-qa="chart"]            可选图表 canvas
 ```
 
-找不到契约节点时回退 `.scale-viewport`、`.scale-stage`、`.table-wrapper`、`thead`;显式 CLI 参数优先级最高。JSON 输出的 `selectors` 必须记录实际命中的 selector,避免验收结果和源码契约脱节。
+找不到契约节点时回退 `.scale-viewport`、`.scale-stage`、`.table-wrapper`、`thead`、`.panel-tabs`、`input[type="search"]/.search-input`、`canvas.chart/.chart canvas`;显式 CLI 参数优先级最高。JSON 输出的 `selectors` 必须记录实际命中的 selector,避免验收结果和源码契约脱节。
 
 ```bash
 node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x1080
 node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x800
+node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x800 \
+  --check-tabs --check-search alpha --check-chart
 ```
 
 bundled Playwright 与本机浏览器 registry 不匹配时,不要联网下载;优先设 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright,并改用系统 Chrome/Edge:
@@ -106,3 +111,6 @@ node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x1080
 - 有表格时 `table-scroll` 只纵向滚动,`scrollWidth <= clientWidth + 1`
 - 表头吸顶:把 wrapper 滚到底后,表头相对 wrapper 的 offset 变化与绝对位置误差均 <=2px
 - `table-head` 挂在首个实际 sticky 的 `<th>` 上,不挂外层 `<thead>`;sticky 行滚动时外层 `<thead>` 仍可能跟着移动,挂在错误宿主会造成验收误判
+- `--check-tabs`:逐个点击 tab 后,`<th>` 文本集合至少出现两种不同状态
+- `--check-search TEXT`:输入后行数必须减少,清空后恢复;至少需要 2 行数据
+- `--check-chart`:canvas 尺寸非零,且采样区域内存在非透明像素
