@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "codegen.config.schema.json",
+  "title": "Figma to Code project contract",
+  "description": "Startup questionnaire and feature-scan contract shared by generation and verification tools.",
+  "type": "object",
+  "required": ["contractVersion", "framework", "ui", "fidelity", "scale"],
+  "additionalProperties": true,
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Bump when the cross-tool contract changes incompatibly."
+    },
+    "framework": {
+      "type": "string",
+      "enum": ["vue2-nobuild", "vue3-vite"]
+    },
+    "ui": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fidelity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scale": {
+      "type": "string",
+      "enum": ["width-adapt", "actual", "fit", "fill-height", "stretch", "custom"]
+    },
+    "fonts": {
+      "type": "string",
+      "minLength": 1
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": {
+        "$comment": "Feature name -> feature descriptor.",
+        "type": "object",
+        "required": ["detected"],
+        "additionalProperties": true,
+        "properties": {
+          "detected": {
+            "type": "boolean"
+          },
+          "lib": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "detected": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "required": ["lib", "nodes"]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

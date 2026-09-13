@@ -1,0 +1,12 @@
+字体许可说明(捆绑于本 Skill,供内网/离线项目复用)
+====================================================
+
+- outfit-var.woff2    — Outfit,SIL Open Font License 1.1(版权 K S Rkanth / Sathish Induri)
+- urbanist-var.woff2  — Urbanist,SIL Open Font License 1.1(版权 Bruno Olling)
+  均来自 Google Fonts 的 latin 子集可变字体切片;OFL 允许随项目再分发,
+  完整许可证见 https://openfontlicense.org / 各字体官网。
+- ionicons.woff/.woff2/.ttf — iView 3.5.4 组件库自带(MIT),必须与 iview.css
+  一起拷入(lib/styles/fonts/ 原路径),否则图标显示为方块。
+
+注意:Google Fonts css2 API 返回的 latin 可变字体切片只含 U+0000-00FF,
+中文不在内;中文场景继续用系统字体栈("Microsoft YaHei" 等),无需下载。

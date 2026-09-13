@@ -1,0 +1,3 @@
+display_name: Figma to Code
+short_description: Figma design to Vue2/Vue3 frontend
+default_prompt: Generate frontend code from Figma design

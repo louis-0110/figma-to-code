@@ -1,0 +1,5 @@
+/* 本地字体(拷到项目 lib/ 下,与 lib/fonts/ 目录配套)
+ * outfit-var / urbanist-var 是 Google Fonts 的可变字体切片(latin),
+ * 一个文件覆盖 100-900 全权重,font-weight 随 CSS 自由取值 */
+@font-face{font-family:"Outfit";font-style:normal;font-weight:100 900;src:url(fonts/outfit-var.woff2) format("woff2")}
+@font-face{font-family:"Urbanist";font-style:normal;font-weight:100 900;src:url(fonts/urbanist-var.woff2) format("woff2")}

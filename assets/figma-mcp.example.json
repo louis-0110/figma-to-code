@@ -1,0 +1,27 @@
+{
+  "_说明": "TalkToFigma MCP 注册模板。复制需要的变体到:项目根 .mcp.json(项目级,随项目走)或 ~/.claude.json 顶层 mcpServers(全局,机器级)。注册解决的是'宿主(Claude Code)↔ MCP server'这一段;server ↔ Figma 桌面插件之间还要插件侧运行并 Join 同一 WebSocket 频道(会话里调 join_channel,频道名以插件面板显示为准)。注册正确但命令超时 = 插件没开/掉线,重开插件重新 join 即可。",
+
+  "_变体A_本机clone_推荐离线可用": {
+    "mcpServers": {
+      "TalkToFigma": {
+        "type": "stdio",
+        "command": "<cursor-talk-to-figma-mcp clone 目录>/start-mcp.cmd",
+        "args": [],
+        "env": {}
+      }
+    }
+  },
+
+  "_变体B_npx_需联网首次较慢": {
+    "mcpServers": {
+      "TalkToFigma": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "cursor-talk-to-figma-mcp@latest"],
+        "env": {}
+      }
+    }
+  },
+
+  "_前置条件": "变体 A 需先 clone cursor-talk-to-figma-mcp 仓库并 npm install(start-mcp.cmd 已路径自适应,任意机器/路径可用;node 查找顺序 PATH → fnm 默认目录)。Figma 桌面端需安装配套插件并保持运行。"
+}

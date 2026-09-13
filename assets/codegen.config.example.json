@@ -1,0 +1,20 @@
+{
+  "$schema": "./codegen.config.schema.json",
+  "contractVersion": 1,
+  "created": "2026-09-03T09:30:00+08:00",
+  "preset": "vue2-nobuild",
+  "framework": "vue2-nobuild",
+  "ui": "iview@3.5.4",
+  "fidelity": "pixel+interaction",
+  "scale": "width-adapt",
+  "$scale-note": "width-adapt=宽度铺满、高度超出竖向滚动 | actual=原尺寸+双向滚动 | fit=完整显示",
+  "fonts": "local-var",
+  "features": {
+    "charts": {
+      "detected": true,
+      "lib": "echarts@5.5.1",
+      "nodes": ["5:12400"]
+    }
+  },
+  "notes": "features 由功能扫描后写入;detected:true 必须带 lib 和 nodes,保留 Figma 节点 ID 便于回查。"
+}
