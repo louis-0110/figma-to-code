@@ -14,11 +14,13 @@ const DIRECTORIES = [
   'src/data',
   'src/styles',
   'assets',
-  'lib'
+  'lib',
+  'qa'
 ];
 
 const TEMPLATE_FILES = [
   { source: 'index.html', target: 'index.html' },
+  { source: 'assets-manifest.example.json', target: 'assets-manifest.json' },
   { source: 'main.js', target: 'src/main.js' },
   { source: 'App.vue', target: 'src/App.vue' },
   { source: 'base.css', target: 'src/styles/base.css' },

@@ -64,13 +64,28 @@ node diff.js <design.png> <shot.png>
 
 ## 达标后
 
+## 机器化完成总闸
+
+每门验收必须保存 JSON，不接受只在终端或聊天里口头汇报“通过”:
+
+```text
+qa/scorecard.json       scorecard.mjs --json 的输出
+qa/verify-ui.json       verify-ui.mjs --json 的输出
+qa/elasticity.json      超长文本/增行/滚动压测报告，必须含 pass: true
+qa/interaction.json     搜索/排序/全选/dropdown/tab 报告，必须含 pass: true
+```
+
+在项目根执行 `node <skill>/assets/completion-gate.mjs . --json`。它会重新运行本地运行时、素材清单和占位符静态审计，并要求上面四个报告全部存在且通过；只要缺一个报告、静态审计失败或报告 `pass` 为假，退出码就是非零。总闸生成 `qa/gate-report.json`，这是交付前唯一的机器完成信号。
+
+若某门不适用，也必须生成明确的 `pass: true` 报告并写明 `skippedReason`，不能删除该门或用截图代替。
+
 - 更新 `codegen.config.json` 的 `quality` 段(diff 指标 + 修复履历)
 - 剩余 irreducible diff 的构成写明(TT Hoves 近似 / 圆角抗锯齿带 / 字形渲染器差异)
 - 清理一次性验收产物:`.figma-selected.json`、`qa/` 里的截图/指标、一次性 Playwright 脚本都不是交付物;保留项目必需的组件、入口、资产、静态服务和最小回归入口
 
 ## 自动 UI 探针
 
-结构审计完成后,先用 bundled `verify-ui.mjs` 做浏览器断言,再进像素与弹性门;项目没有表格时加 `--skip-table`。它依赖目标项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright。
+结构审计完成后,先用 bundled `verify-ui.mjs` 做浏览器断言,再进像素与弹性门;项目没有表格时加 `--skip-table`。它会自动发现项目依赖、当前 Node 运行时旁的 Playwright，以及本机 Playwright 浏览器缓存；显式环境变量仍可覆盖自动发现。
 
 默认 selector 契约是:
 
@@ -93,7 +108,7 @@ node verify-ui.mjs --url http://127.0.0.1:8080 --viewport 1920x800 \
   --check-tabs --check-search alpha --check-chart
 ```
 
-bundled Playwright 与本机浏览器 registry 不匹配时,不要联网下载;优先设 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright,并改用系统 Chrome/Edge:
+如果自动发现失败或 bundled Playwright 与本机浏览器 registry 不匹配时,不要联网下载;可显式设 `PLAYWRIGHT_MODULE` 指向已安装的 Playwright,并改用系统 Chrome/Edge:
 
 ```bash
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \

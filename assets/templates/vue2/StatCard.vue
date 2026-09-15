@@ -2,7 +2,8 @@
   <div class="stat-card" :data-qa="'stat-' + id">
     <div class="stat-block" v-for="b in blocks" :key="b.key">
       <div class="stat-top">
-        <span class="stat-icon" v-if="b.icon" v-html="b.icon"></span>
+        <!-- Replace template:stat-icon with the real Figma node id in the generated page. -->
+        <span class="stat-icon" data-figma-node="template:stat-icon" v-if="b.icon" v-html="b.icon"></span>
         <span class="stat-label">{{ b.label }}</span>
       </div>
       <div class="stat-value num">{{ b.value }}</div>

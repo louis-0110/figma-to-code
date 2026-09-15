@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 import { validateConfig } from './validate-config.mjs';
+import { loadPlaywright } from './playwright-runtime.mjs';
 
 const skillAssets = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(join(skillAssets, 'package.json'));
 
 const checks = [];
 const args = process.argv.slice(2);
@@ -22,7 +21,7 @@ function check(name, pass, detail = '') {
   process.stdout.write(`${pass ? 'PASS' : 'FAIL'} ${name}${detail ? `: ${detail}` : ''}\n`);
 }
 
-function runNode(scriptPath, scriptArgs = [], env = {}) {
+function runNode(scriptPath, scriptArgs = [], env = {}, acceptedCodes = [0]) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath, ...scriptArgs], {
       cwd: process.cwd(),
@@ -39,21 +38,10 @@ function runNode(scriptPath, scriptArgs = [], env = {}) {
     });
     child.on('error', reject);
     child.on('close', (code) => {
-      if (code === 0) resolve(output);
+      if (acceptedCodes.includes(code)) resolve(output);
       else reject(new Error(`${scriptPath} exited with ${code}`));
     });
   });
-}
-
-async function loadPlaywright() {
-  if (process.env.PLAYWRIGHT_MODULE) {
-    return import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
-  }
-  try {
-    return await import('playwright');
-  } catch {
-    return import(pathToFileURL(require.resolve('playwright')).href);
-  }
 }
 
 function startServer(fixture) {
@@ -194,7 +182,18 @@ async function main() {
   const configErrors = validateConfig(config);
   check('config-contract', configErrors.length === 0, configErrors.join(' | ') || 'contractVersion=1 validated');
 
-  for (const script of ['scaffold-vue2.mjs', 'validate-config.mjs', 'verify-ui.mjs']) {
+  for (const script of [
+    'scaffold-vue2.mjs',
+    'validate-config.mjs',
+    'verify-ui.mjs',
+    'verify-runtime.mjs',
+    'verify-assets.mjs',
+    'detect-placeholders.mjs',
+    'completion-gate.mjs',
+    'pipeline-state.mjs',
+    'figma-bridge.mjs',
+    'playwright-runtime.mjs'
+  ]) {
     try {
       await runNode('--check', [join(skillAssets, script)]);
       check(`syntax-${script}`, true);
@@ -210,6 +209,7 @@ async function main() {
 
     const expected = [
       'index.html',
+      'assets-manifest.json',
       'src/main.js',
       'src/App.vue',
       'src/styles/base.css',
@@ -242,6 +242,76 @@ async function main() {
       (tableSource.includes('data-qa="table-head"') || tableSource.includes("'table-head'"))
     ];
     check('selector-contract', selectors.every(Boolean), selectors.every(Boolean) ? 'scale and table hooks present' : 'missing data-qa hooks');
+
+    for (const library of [
+      'vue.min.js',
+      'vue2-sfc-loader.js',
+      'iview.min.js',
+      'iview.css',
+      'echarts.min.js'
+    ]) {
+      await writeFile(join(tempRoot, 'lib', library), '/* self-test local runtime */\n', 'utf8');
+    }
+    await writeFile(
+      join(tempRoot, 'assets', 'test-icon.png'),
+      Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    );
+    await writeFile(join(tempRoot, 'src', 'data', 'asset-ref.js'), "export default 'assets/test-icon.png';\n", 'utf8');
+    await writeFile(join(tempRoot, 'assets-manifest.json'), JSON.stringify({
+      version: 1,
+      requiredNodeIds: ['1:1'],
+      assets: [{ nodeId: '1:1', path: 'assets/test-icon.png', expected: { width: 1, height: 1 } }],
+      cssNodes: [],
+      ignoredNodes: []
+    }, null, 2), 'utf8');
+    const runtimeChecks = [
+      ['verify-runtime.mjs', [tempRoot, '--strict']],
+      ['verify-assets.mjs', [tempRoot, '--strict']],
+      ['detect-placeholders.mjs', [tempRoot, '--strict-icons']]
+    ];
+    for (const [script, scriptArgs] of runtimeChecks) {
+      try {
+        await runNode(join(skillAssets, script), scriptArgs);
+        check(`static-${script}`, true);
+      } catch (error) {
+        check(`static-${script}`, false, error.message);
+      }
+    }
+    await writeFile(join(tempRoot, 'src', 'data', 'placeholder.js'), "export default '⚙';\n", 'utf8');
+    try {
+      await runNode(join(skillAssets, 'detect-placeholders.mjs'), [tempRoot, '--strict-icons'], {}, [1]);
+      check('placeholder-negative-test', true, 'fake icon correctly rejected');
+    } catch (error) {
+      check('placeholder-negative-test', false, error.message);
+    } finally {
+      await rm(join(tempRoot, 'src', 'data', 'placeholder.js'), { force: true });
+    }
+
+    await writeFile(join(tempRoot, 'pipeline-input.json'), '{"phase":"self-test"}\n', 'utf8');
+    try {
+      await runNode(join(skillAssets, 'pipeline-state.mjs'), [tempRoot, '--phase', 'self-test', '--input', 'pipeline-input.json'], {}, [10]);
+      check('pipeline-state-dirty', true, 'first run is dirty');
+      await runNode(join(skillAssets, 'pipeline-state.mjs'), [tempRoot, '--phase', 'self-test', '--input', 'pipeline-input.json', '--write'], {}, [10]);
+      await runNode(join(skillAssets, 'pipeline-state.mjs'), [tempRoot, '--phase', 'self-test', '--input', 'pipeline-input.json']);
+      check('pipeline-state-cache', true, 'write then unchanged');
+    } catch (error) {
+      check('pipeline-state-cache', false, error.message);
+    }
+
+    for (const [name, value] of [
+      ['scorecard.json', { verdict: 'PASS' }],
+      ['verify-ui.json', { pass: true }],
+      ['elasticity.json', { pass: true, skippedReason: 'self-test fixture' }],
+      ['interaction.json', { pass: true, skippedReason: 'self-test fixture' }]
+    ]) {
+      await writeFile(join(tempRoot, 'qa', name), JSON.stringify(value, null, 2), 'utf8');
+    }
+    try {
+      await runNode(join(skillAssets, 'completion-gate.mjs'), [tempRoot]);
+      check('completion-gate', true, 'static audits + four reports passed');
+    } catch (error) {
+      check('completion-gate', false, error.message);
+    }
 
     if (!skipBrowser) {
       try {

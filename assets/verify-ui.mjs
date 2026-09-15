@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import process from 'node:process';
+import { loadPlaywright, resolveChromiumExecutable } from './playwright-runtime.mjs';
 
 const DATA_QA_SELECTORS = {
   scrollContainer: '[data-qa="scale-viewport"]',
@@ -104,26 +102,6 @@ function parseArgs(argv) {
   if (options.browserExecutable && !options.browserExecutable.trim()) throw new Error('--browser-executable must be a path');
   if (!Number.isFinite(options.wait) || options.wait < 0) throw new Error('--wait must be a non-negative number');
   return options;
-}
-
-async function loadPlaywright() {
-  if (process.env.PLAYWRIGHT_MODULE) {
-    return import(pathToFileURL(resolve(process.env.PLAYWRIGHT_MODULE)).href);
-  }
-
-  try {
-    return await import('playwright');
-  } catch (error) {
-    const candidates = [process.cwd(), import.meta.url];
-    for (const candidate of candidates) {
-      try {
-        const require = createRequire(join(dirname(candidate), 'package.json'));
-        const resolved = require.resolve('playwright');
-        return await import(pathToFileURL(resolved).href);
-      } catch {}
-    }
-    throw new Error(`Playwright is not resolvable. Install it in the project or set PLAYWRIGHT_MODULE. (${error.message})`);
-  }
 }
 
 async function resolveSelector(page, explicit, candidates, label) {
@@ -260,7 +238,8 @@ async function main() {
 
   const { chromium } = await loadPlaywright();
   const launchOptions = { headless: true };
-  if (options.browserExecutable) launchOptions.executablePath = options.browserExecutable;
+  const executablePath = options.browserExecutable || await resolveChromiumExecutable();
+  if (executablePath) launchOptions.executablePath = executablePath;
   const browser = await chromium.launch(launchOptions);
   const page = await browser.newPage({ viewport: { width: options.viewport[0], height: options.viewport[1] } });
   const consoleErrors = [];

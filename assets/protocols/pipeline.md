@@ -4,7 +4,9 @@
 
 ## 步 0:环境自检与配置约定
 
-`node <skill>/assets/doctor.mjs <项目根>` — 一键体检:node ≥18 / REST token 三级查找链验真 / TalkToFigma MCP 注册扫描(全局 ~/.claude.json + 项目 .mcp.json)/ 3055 桥接 TCP 探测 / 工具池齐全性。✗ 项按提示修复,全过再开工。
+`node <skill>/assets/doctor.mjs <项目根>` — 一键体检:node ≥18 / REST token 三级查找链验真 / TalkToFigma MCP 注册扫描(全局 ~/.claude.json + 项目 .mcp.json)/ 3055 桥接 TCP 探测 / 工具池齐全性。随后运行 `verify-runtime.mjs <项目根> --strict` 和 `validate-config.mjs <项目根>`。✗ 项按提示修复,全过再开工。
+
+耗时阶段使用 `pipeline-state.mjs` 记录输入哈希，例如 `--phase tree --input node-info.json --write`。返回 `UNCHANGED` 时可复用已有产物；返回 `DIRTY` 时才重跑该阶段。换了 Figma 文件、频道数据、脚本版本或配置后不要复用旧结果。
 
 **配置约定(秘密不进 Skill)**:
 - token 查找链:`FIGMA_TOKEN` 环境变量 → `~/.secrets/figma`(机器级)→ 项目 `.secrets/env`;`.secrets/` 必须 .gitignore;明文出现过的 token 要 revoke 轮换
@@ -69,6 +71,7 @@
 - 复杂装饰(渐变+光斑+文字)整体烘焙最保真(实测 9.3% vs CSS 重绘 39%),交互部分叠透明热区
 - 带圆角 Frame 导出四角是**不透明白** → body 白底 + 舞台 border-radius 复刻
 - 字体:捆绑包(Outfit/Urbanist/ionicons)> `get-fonts.mjs`;商业字体(TT Hoves 等)用近似体并在 config 记录
+- 同步维护项目根 `assets-manifest.json`：`assets[]` 记录 `nodeId/path/expected`，CSS 重建登记 `cssNodes[]`，无法导出但已审议的节点登记 `ignoredNodes[]` + `reason`，关键视觉节点登记 `requiredNodeIds[]`。生成后运行 `verify-assets.mjs <项目根> --strict`，它会检查文件魔数、尺寸、重复映射和源码引用。
 
 > 注:scan-tree / layout-infer / detect-hidden / fetch-visible 均已内置宽容加载器(裸 JSON 与 `[{type,text}]` 包装均可直读),落盘文件无需预处理。
 
@@ -77,5 +80,8 @@
 - 按〇节 config + 布局树 + patterns/ 模式实现;颜色/字体引用 tokens
 - 先冒烟(Vue2:Button+{{1+1}} 跑 0 报错)再铺组件
 - 环境:node 不在 PATH → fnm 目录(`~/AppData/Roaming/fnm/node-versions/vx/installation`);Git Bash `/tmp` 与 node 不互通,用项目内路径;静态服务用零依赖 `serve.mjs`(no-store 头)
+- 生成结束立即运行 `detect-placeholders.mjs <项目根> --strict-icons`，发现 Unicode/emoji/未映射图标时停止，不进入视觉验收。
 
 ## 步 7:验收 → protocols/verification.md(四门)
+
+四门输出固定 JSON 后运行 `completion-gate.mjs`；浏览器能打开、Playwright 单次检查通过或人工肉眼确认，都不能替代总闸。

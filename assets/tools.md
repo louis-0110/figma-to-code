@@ -28,6 +28,8 @@
 | `crop-assets.mjs` | 整帧导出图裁素材(分号 ID 导不出时的兜底;魔数判格式) |
 | `extract-card-assets.mjs` | 从导出图按色块/圆角裁卡片背景等素材 |
 | `diff.js` | 截图 vs 导出图 diff,支持 `--heat` 输出热力图 |
+| `verify-assets.mjs` | 校验 `assets-manifest.json`、Figma nodeId 映射、文件魔数/尺寸和源码引用 |
+| `detect-placeholders.mjs` | 扫描 Unicode/emoji/未登记 icon，阻止假图标进入验收 |
 
 ## 验收工具
 
@@ -35,6 +37,9 @@
 |---|---|
 | `scorecard.mjs` | 回归评分:门1 像素 + 门2 墨迹自动量化,对比 regression.json 基线 |
 | `doctor.mjs` | 环境自检:`node doctor.mjs <项目根>`(node 版本 / REST token / MCP 注册 / 3055 桥接 / 工具池) |
+| `verify-runtime.mjs` | Vue2 无构建入口的本地依赖、离线引用和脚本顺序预检 |
+| `completion-gate.mjs` | 串联静态审计并强制四门 JSON 报告全部通过 |
+| `pipeline-state.mjs` | 以输入 SHA-256 判断阶段是否可复用，减少重复拉取/截图 |
 
 ## 配置与跨工具
 
@@ -53,8 +58,10 @@
 | `validate-config.mjs` | `node validate-config.mjs <config.json-or-project-root>` | 零依赖校验 `contractVersion=1`、框架/缩放枚举和 features 契约;也可 `import { validateConfig }` |
 | `scaffold-vue2.mjs` | `node scaffold-vue2.mjs <target-root>`;先 `--dry-run` 预览 | 仅支持 `vue2-nobuild`;不覆盖已有文件;模板唯一来源是 `templates/vue2/`;生成 Vue2 SFC 结构并复制 bundled 缩放库;缺失本地 Vue/iView/echarts 时输出 WARN |
 | `templates/vue2/` | 由 `scaffold-vue2.mjs` 复制 | Vue2 SFC 唯一模板来源;先改模板,再跑自测,不要在生成器里内联整份组件 |
-| `test-skill.mjs` | `node test-skill.mjs`;临时产物可加 `--keep`,无浏览器环境加 `--skip-browser` | 校验 config contract、三个入口脚本语法、Vue2 scaffold 文件、`data-qa` selector、本地 HTTP fixture 浏览器契约和 tabs/search/chart 交互探针;成功输出 `8/8 passed` |
-| `verify-ui.mjs` | `node verify-ui.mjs --url <URL> --viewport 1920x800` | Playwright/Chromium 探针;断言 stage 宽度、横向溢出、竖向滚动、表格只纵向滚动、表头吸顶和 console errors。依赖项目或 `PLAYWRIGHT_MODULE` 可解析 Playwright |
+| `templates/vue2/assets-manifest.example.json` | 脚手架复制为项目根 `assets-manifest.json` | 每个视觉叶子节点的 Figma 素材/CSS/审议忽略映射入口 |
+| `test-skill.mjs` | `node test-skill.mjs`;临时产物可加 `--keep`,无浏览器环境加 `--skip-browser` | 校验 config contract、入口脚本语法、Vue2 scaffold 文件、素材清单/占位符/缓存/完成总闸、`data-qa` selector、本地 HTTP fixture 浏览器契约和 tabs/search/chart 交互探针;无浏览器依赖时静态部分可用 `--skip-browser`，当前完整基线为 `21/21 passed` |
+| `verify-ui.mjs` | `node verify-ui.mjs --url <URL> --viewport 1920x800` | Playwright/Chromium 探针;自动发现项目/运行时 Playwright 和本机浏览器缓存,断言 stage 宽度、横向溢出、竖向滚动、表格只纵向滚动、表头吸顶和 console errors |
+| `playwright-runtime.mjs` | 被 `verify-ui.mjs` / `test-skill.mjs` 调用 | 统一发现 Playwright 模块与本机 Chromium;支持 `PLAYWRIGHT_MODULE`、`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 显式覆盖,不联网下载 |
 | 同上 | 加 `--check-tabs`、`--check-search TEXT`、`--check-chart` 开启可选交互探针 | tabs 验证切签后列集合变化;search 验证过滤与还原;chart 验证 canvas 非空白。默认 selector 为 `data-qa="panel-tabs"/search-input/chart`,也可显式覆盖 |
 | 同上 | 显式 `--scroll-container/--stage/--table-wrapper/--thead` 参数优先 | 默认按 `data-qa` 契约查找,找不到时回退 legacy selector;JSON 输出的 `selectors` 记录实际命中的 selector |
 | 同上 | 加 `--browser-executable <Chrome/Edge 路径>`,或设 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | bundled 浏览器版本不匹配时用系统 Chrome/Edge,不联网下载浏览器 |

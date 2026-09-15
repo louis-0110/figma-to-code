@@ -43,6 +43,24 @@ Figma 插件 manifest 在 `assets/mcp/figma-plugin/manifest.json`(code.js/ui.htm
 
 3055 桥接是否在线由 doctor 探测。
 
+## MCP 工具未暴露时的标准 CLI 兜底
+
+部分宿主不会把 `talk-to-figma` 的 MCP 方法注入当前 agent，但插件和 3055 桥接仍然可用。此时不要临时手写 WebSocket，也不要猜测频道，使用捆绑客户端:
+
+```bash
+node <skill>/assets/figma-bridge.mjs \
+  --channel <Figma 插件面板显示的频道> \
+  --command get_document_info \
+  --json
+node <skill>/assets/figma-bridge.mjs \
+  --channel <频道> \
+  --command get_node_info \
+  --params '{"nodeId":"123:456"}' \
+  --timeout 30000 --json
+```
+
+客户端会先 join 指定频道，再发送一条命令，等待带同一 `id` 的响应；命令错误、桥接错误和超时均以非零退出码返回。频道以插件当前面板为准，频道名错误时应让用户在 Figma 中重新 Join 后重试。大量节点读取仍应优先使用批量命令或 MCP 原生工具，避免逐节点往返造成生成变慢。
+
 ## 新项目/新机器第一步
 
 ```bash

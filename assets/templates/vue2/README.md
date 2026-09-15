@@ -32,6 +32,11 @@ node assets/test-skill.mjs
 - `BaseDataTable.vue`：原生表格底座，首个表头单元格吸顶，tbody 在 wrapper 内滚动。
 - `BaseChart.vue`：ECharts 初始化、更新、resize 和销毁底座。
 - `TabbedTablePanel.vue`：`columnSets` + `rowsByTab` 的业务面板参考，演示页签驱动列集。
+- `assets-manifest.json`：由脚手架从 `assets-manifest.example.json` 生成；记录每个 Figma 视觉节点对应的导出文件、CSS 重建或审议后的忽略原因。
+
+## 交付门
+
+生成页面后，把四门结果保存到项目 `qa/`：`scorecard.json`、`verify-ui.json`、`elasticity.json`、`interaction.json`。先运行素材、运行时和占位符静态检查，再运行 `completion-gate.mjs`；总闸通过前不要把页面标记为完成。
 
 ## 占位符
 
